@@ -1,5 +1,4 @@
 <resources>
     <string name="app_name">My Application</string>
-    <string name="start">Start</string>
-    <string name="stop">Stop</string>
+    <string name="Record">Record</string>
 </resources>
