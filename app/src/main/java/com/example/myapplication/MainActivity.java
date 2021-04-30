@@ -1,12 +1,17 @@
 package com.example.myapplication;
 
 import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.icu.text.DateFormat;
+import android.icu.util.Calendar;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.MediaStore;
@@ -14,11 +19,14 @@ import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
 import android.speech.tts.TextToSpeech;
+import android.text.format.DateUtils;
 import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.Locale;
 
 import static android.Manifest.permission.RECORD_AUDIO;
@@ -132,14 +140,71 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    @RequiresApi(api = Build.VERSION_CODES.N)
     private void responce(String msg) {
         String msgs = msg.toLowerCase();
         if (msgs.indexOf("hi")!= -1){
             speak( "hello sir ! how are you?");
 
+        }
+        if (msgs.indexOf("hello")!= -1){
+            speak( "hello sir ! how are you?");
+
         }else if (msgs.indexOf("i am not fine")!= -1){
             speak("please take care");
         }
+        if (msgs.indexOf("what")!= -1){
+            if (msgs.indexOf("your")!= -1){
+                if (msgs.indexOf("name")!= -1){
+                    speak( "My name is shreya");
+                }
+            }
+            if(msgs.indexOf("time")!= -1){
+                if(msgs.indexOf("now")!= -1){
+                    Date date = new Date();
+                    String time = DateUtils.formatDateTime(this,date.getTime(),DateUtils.FORMAT_SHOW_TIME);
+                    speak("The time now is"+time);
+                }
+            }
+
+            if(msgs.indexOf("today")!= -1){
+                if(msgs.indexOf("date")!= -1){
+                   SimpleDateFormat df = new SimpleDateFormat("dd MM yyyy");
+                   Calendar cal = Calendar.getInstance();
+                   String todays_date = df.format(cal.getTime());
+                   speak("the today's date is "+todays_date);
+                }
+            }
+        }
+        if(msgs.indexOf("open")!= -1){
+            if(msgs.indexOf("google")!= -1){
+                Intent intent =new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com"));
+                startActivity(intent);
+            }
+            if(msgs.indexOf("browser")!= -1){
+                Intent intent =new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com"));
+                startActivity(intent);
+            }
+            if(msgs.indexOf("chrome")!= -1){
+                Intent intent =new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com"));
+                startActivity(intent);
+            }
+            if(msgs.indexOf("youtube")!= -1){
+                Intent intent =new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.facebook.com"));
+                startActivity(intent);
+            }
+            if(msgs.indexOf("facebook")!= -1){
+                Intent intent =new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.facebook.com"));
+                startActivity(intent);
+            }
+            if(msgs.indexOf("whatsapp")!= -1){
+                Context ctx = this;
+                Intent i = ctx.getPackageManager().getLaunchIntentForPackage("com.whatsapp");
+                ctx.startActivity(i);
+            }
+        }
+
+
     }
 
 
