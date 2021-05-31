@@ -26,6 +26,7 @@ import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.airbnb.lottie.LottieAnimationView;
 import com.example.ai_webza_tec.ai_method;
 import com.karumi.dexter.Dexter;
 import com.karumi.dexter.MultiplePermissionsReport;
@@ -57,6 +58,9 @@ public class MainActivity extends AppCompatActivity {
     private TextView textView;
     private TextView textview2;
     private TextToSpeech tts;
+    private boolean animationOn = false;
+
+    LottieAnimationView lottieAnimation;
 
 
     @Override
@@ -69,7 +73,28 @@ public class MainActivity extends AppCompatActivity {
         initializeResult();
 
 
+        lottieAnimation = findViewById(R.id.lottieAnimation);
 
+        lottieAnimation.setOnClickListener(new View.OnClickListener() {
+                                               @Override
+                                               public void onClick(View view) {
+                                                   if (animationOn) {
+                                                       lottieAnimation.setMinAndMaxProgress(0.5f, 1.0f);
+                                                       lottieAnimation.playAnimation();
+                                                       animationOn = false;
+                                                   } else {
+                                                       lottieAnimation.setMinAndMaxProgress(0.0f, 0.5f);
+                                                       lottieAnimation.playAnimation();
+                                                       animationOn = true;
+                                                   }
+                                                   intentRecognizer = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);//The constant ACTION_RECOGNIZE_SPEECH starts an activity that will prompt the user for speech and send it through a speech recognizer.
+                                                   intentRecognizer.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, //Informs the recognizer which speech model to prefer when performing ACTION_RECOGNIZE_SPEECH.
+                                                           RecognizerIntent.LANGUAGE_MODEL_FREE_FORM); //Use a language model based on free-form speech recognition
+                                                   intentRecognizer.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
+                                                   speechRecognizer.startListening(intentRecognizer);
+                                               }
+
+                                           });
         ActivityCompat.requestPermissions(this, new String[]{RECORD_AUDIO}, PackageManager.PERMISSION_GRANTED); //To grant permission to use microphone
 
 
@@ -269,15 +294,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    public void Record(View view) {
-        intentRecognizer = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);//The constant ACTION_RECOGNIZE_SPEECH starts an activity that will prompt the user for speech and send it through a speech recognizer.
-        intentRecognizer.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, //Informs the recognizer which speech model to prefer when performing ACTION_RECOGNIZE_SPEECH.
-                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM); //Use a language model based on free-form speech recognition
-        intentRecognizer.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
-        speechRecognizer.startListening(intentRecognizer);
-    }
 
 }
+
+
 
 
 
