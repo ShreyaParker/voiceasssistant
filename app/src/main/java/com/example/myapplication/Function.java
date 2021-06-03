@@ -1,6 +1,9 @@
 package com.example.myapplication;
 
+import android.content.Intent;
 import android.util.Log;
+import android.view.LayoutInflater;
+import android.view.View;
 
 import java.util.Calendar;
 
@@ -19,7 +22,7 @@ public class Function {
         } else if (time >= 21 && time < 22) {
             s = "Good Night";
         } else if (time >= 22 && time < 24) {
-            s = "You need to take a rest... it's too late";
+            s = "You need to take rest... it's too late";
         }
         return s;
     }
@@ -52,4 +55,7 @@ public class Function {
 
         return name;
     }
+
+
+
 }

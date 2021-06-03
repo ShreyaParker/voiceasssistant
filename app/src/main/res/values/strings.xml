@@ -1,5 +1,7 @@
 <resources>
     <string name="app_name">My Application</string>
     <string name="Record">Record</string>
-    <string name="camera">Record</string>
+    <string name="camera">camera</string>
+    <string name="start_reading">start_reading</string>
+    <string name="lottieAnimation">lottieAnimation</string>
 </resources>

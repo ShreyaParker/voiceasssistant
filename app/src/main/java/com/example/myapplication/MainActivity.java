@@ -6,33 +6,52 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 
 import android.Manifest;
+import android.app.SearchManager;
+import android.bluetooth.BluetoothAdapter;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.hardware.camera2.CameraAccessException;
+import android.hardware.camera2.CameraManager;
 import android.media.session.MediaSession;
 import android.net.Uri;
+import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.MediaStore;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
 import android.speech.tts.TextToSpeech;
-import android.text.format.DateFormat;
 import android.text.format.DateUtils;
 import android.util.Log;
+import android.util.SparseArray;
+import android.view.LayoutInflater;
+import android.view.SurfaceHolder;
+import android.view.SurfaceView;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.airbnb.lottie.LottieAnimationView;
 import com.example.ai_webza_tec.ai_method;
+import com.google.android.gms.vision.CameraSource;
+import com.google.android.gms.vision.Detector;
+import com.google.android.gms.vision.text.TextBlock;
+import com.google.android.gms.vision.text.TextRecognizer;
 import com.karumi.dexter.Dexter;
 import com.karumi.dexter.MultiplePermissionsReport;
 import com.karumi.dexter.PermissionToken;
 import com.karumi.dexter.listener.PermissionRequest;
 import com.karumi.dexter.listener.multi.MultiplePermissionsListener;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -40,8 +59,10 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Random;
 
 import static android.Manifest.permission.RECORD_AUDIO;
+import static android.Manifest.permission.CAMERA;
 import static com.example.ai_webza_tec.ai_method.checkForPreviousCallList;
 import static com.example.ai_webza_tec.ai_method.clearContactListSavedData;
 import static com.example.ai_webza_tec.ai_method.getContactList;
@@ -51,61 +72,180 @@ import static com.example.myapplication.Function.fetchName;
 import static com.example.myapplication.Function.wishMe;
 
 public class MainActivity extends AppCompatActivity {
-
     private SpeechRecognizer speechRecognizer;
+
     private Intent intentRecognizer;
     private TextView textView;
-    private TextView textview2;
+    private TextView textView2;
     private TextToSpeech tts;
+    private SurfaceView surfaceView;
 
+    private CameraSource cameraSource;
+    private TextRecognizer textRecognizer;
+    private String stringResult = null;
+    private WifiManager wifiManager;
+    private boolean animationOn = false;
+
+    LottieAnimationView lottieAnimation;
+
+    private CameraManager cameraManager;
+    private String cameraID;
 
     @Override
     protected void onCreate(Bundle savedInstanceState)//When an Activity first call or launched then this method is responsible to create the activity.
     {
         super.onCreate(savedInstanceState);//run your code in addition to the existing code in the onCreate() of the parent class.
         setContentView(R.layout.activity_main); //sets the XML file as you want as your main layout when the app starts
+        wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
         findById();
         initializeTextToSpeech();
         initializeResult();
 
+        lottieAnimation = findViewById(R.id.lottieAnimation);
 
+        lottieAnimation.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if (animationOn) {
+                    lottieAnimation.setMinAndMaxProgress(0.5f, 1.0f);
+                    lottieAnimation.playAnimation();
+                    animationOn = false;
+                } else {
+                    lottieAnimation.setMinAndMaxProgress(0.0f, 0.5f);
+                    lottieAnimation.playAnimation();
+                    animationOn = true;
+                }
+                intentRecognizer = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);//The constant ACTION_RECOGNIZE_SPEECH starts an activity that will prompt the user for speech and send it through a speech recognizer.
+                intentRecognizer.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, //Informs the recognizer which speech model to prefer when performing ACTION_RECOGNIZE_SPEECH.
+                        RecognizerIntent.LANGUAGE_MODEL_FREE_FORM); //Use a language model based on free-form speech recognition
+                intentRecognizer.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
+                speechRecognizer.startListening(intentRecognizer);
+            }
 
+        });
+
+        ActivityCompat.requestPermissions(this, new String[]{CAMERA}, PackageManager.PERMISSION_GRANTED);
         ActivityCompat.requestPermissions(this, new String[]{RECORD_AUDIO}, PackageManager.PERMISSION_GRANTED); //To grant permission to use microphone
 
+        tts = new TextToSpeech(this, new TextToSpeech.OnInitListener() {
+            @Override
+            public void onInit(int status) {
+            }
+        });
+
+        cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
+        try {
+            cameraID = cameraManager.getCameraIdList()[0]; // 0 is for back camera and 1 is for front camera
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
 
+    }
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        cameraSource.release();
+    }
+
+    private void textRecognizer(){
+        textRecognizer = new TextRecognizer.Builder(getApplicationContext()).build();
+        cameraSource = new CameraSource.Builder(getApplicationContext(), textRecognizer)
+                .setRequestedPreviewSize(1280, 1024)
+                .build();
+
+        surfaceView = findViewById(R.id.surfaceView);
+        surfaceView.getHolder().addCallback(new SurfaceHolder.Callback() {
+            @Override
+            public void surfaceCreated(SurfaceHolder holder) {
+                try {
+                    cameraSource.start(surfaceView.getHolder());
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+
+            @Override
+            public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+            }
+
+            @Override
+            public void surfaceDestroyed(SurfaceHolder holder) {
+                cameraSource.stop();
+            }
+        });
 
 
+        textRecognizer.setProcessor(new Detector.Processor<TextBlock>() {
+            @Override
+            public void release() {
+            }
+
+            @Override
+            public void receiveDetections(Detector.Detections<TextBlock> detections) {
+
+                SparseArray<TextBlock> sparseArray = detections.getDetectedItems();
+                StringBuilder stringBuilder = new StringBuilder();
+
+                for (int i = 0; i<sparseArray.size(); ++i){
+                    TextBlock textBlock = sparseArray.valueAt(i);
+                    if (textBlock != null && textBlock.getValue() !=null){
+                        stringBuilder.append(textBlock.getValue() + " ");
+                    }
+                }
+
+                final String stringText = stringBuilder.toString();
+
+                Handler handler = new Handler(Looper.getMainLooper());
+                handler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        stringResult = stringText;
+                        resultObtained();
+                    }
+                });
+            }
+        });
+    }
+
+    private void resultObtained(){
+        setContentView(R.layout.activity_main);
+        textView2 = findViewById(R.id.textView2);
+        textView2.setText(stringResult);
+        tts.speak(stringResult, TextToSpeech.QUEUE_FLUSH, null, null);
     }
 
     private void initializeTextToSpeech() {
         tts= new TextToSpeech(this, new TextToSpeech.OnInitListener() {
             @Override
             public void onInit(int status) {  //called to signal the completion of the TextToSpeech engine initialization.
+                tts.setPitch(1.1f); // saw from internet
+                tts.setSpeechRate(0.7f);
                 if (tts.getEngines().size()==0) {
                     Toast.makeText(MainActivity.this, "Engine is not available", Toast.LENGTH_SHORT).show();
                 }else{
                     String s = wishMe();//wishMe function to greet by time
-                    speak("Hii I am ..."+s);
+                    speak("Hii I am Vision..."+s);
 
                 }
+
             }
         });
     }
 
     private void speak(String msg) {
-        textview2.setText(msg);
+        textView2.setText(msg);
         //// Check if we're running on Android 5.0 or higher
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP){
             tts.speak(msg,TextToSpeech.QUEUE_FLUSH, null, null);
         }else{
-            tts.speak(msg,TextToSpeech.QUEUE_FLUSH, null);
+            tts.speak(msg,TextToSpeech.QUEUE_FLUSH,null);
         }
     }
 
     private void findById(){
         textView = (TextView)findViewById(R.id.textView);
-        textview2= (TextView)findViewById(R.id.textView2);
+        textView2= (TextView)findViewById(R.id.textView2);
     }
     private void initializeResult() {
         if (SpeechRecognizer.isRecognitionAvailable( this)){
@@ -161,6 +301,7 @@ public class MainActivity extends AppCompatActivity {
             public void onEvent(int eventType, Bundle params) {
 
             } //Reserved for adding future eevents
+
         });
         }
     }
@@ -168,65 +309,298 @@ public class MainActivity extends AppCompatActivity {
     @RequiresApi(api = Build.VERSION_CODES.N)
     private void responce(String msg) { //responce we get from tts
         String msgs = msg.toLowerCase();
-        if (msgs.indexOf("hi")!= -1){
-            speak( "hello ! how are you?");
+        if (msgs.indexOf("hi") != -1) {
+            String name[] = {"Hi. How may I help you?",
+                    "hello ! It's good to hear from you",
+                    "Namaste, how can i help you?"};
+
+            {
+                Random random = new Random();
+                int index = random.nextInt(name.length - 0) + 0;
+                speak("" + name[index]);
+            }
 
         }
-        if (msgs.indexOf("hello")!= -1){
-            speak( "hello ! how are you?");
 
-        }else if (msgs.indexOf("i am not fine")!= -1){
+        if (msgs.indexOf("hey") != -1) {
+            String name[] = {"hey there!",
+                    "hello! It's nice to hear from you",
+                    "hey there, how may i help you?",
+                    "Namaste, how can i help you?"};
+
+            {
+                Random random = new Random();
+                int index = random.nextInt(name.length - 0) + 0;
+                speak("" + name[index]);
+            }
+
+        }
+        if (msgs.indexOf("hello") != -1) {
+            String name[] = {"Hello, how may i help you?",
+                    "hello! It's nice to hear from you",
+                    "Hey there, how may i help you?",
+                    "Namaste, how can i help you?"};
+
+            {
+                Random random = new Random();
+                int index = random.nextInt(name.length - 0) + 0;
+                speak("" + name[index]);
+            }
+            if (msgs.indexOf("i am fine") != 1) {
+                speak("good to hear");
+            }
+        } else if (msgs.indexOf("i am not fine") != -1) {
             speak("please take care");
         }
-        if (msgs.indexOf("what")!= -1){
-            if (msgs.indexOf("your")!= -1){
-                if (msgs.indexOf("name")!= -1){
-                    speak( "My name is ");
+        if (msgs.indexOf("what") != -1) {
+            if (msgs.indexOf("your") != -1) {
+                if (msgs.indexOf("name") != -1) {
+                    speak("My name is Vision");
                 }//tells the name
             }
-            if(msgs.indexOf("time")!= -1){
-                if(msgs.indexOf("now")!= -1){
+            if (msgs.indexOf("time") != -1) {
+                if (msgs.indexOf("now") != -1) {
                     Date date = new Date();
-                    String time = DateUtils.formatDateTime(this,date.getTime(),DateUtils.FORMAT_SHOW_TIME);
-                    speak("The time now is"+time);
+                    String time = DateUtils.formatDateTime(this, date.getTime(), DateUtils.FORMAT_SHOW_TIME);
+                    speak("The time now is" + time);
                 }//tells currunt time
             }
-
-            if(msgs.indexOf("today")!= -1){
-                if(msgs.indexOf("date")!= -1){
-                    SimpleDateFormat df = new  SimpleDateFormat("dd MMMM yyyy");
+            if (msgs.indexOf("today") != -1) {
+                if (msgs.indexOf("date") != -1) {
+                    SimpleDateFormat df = new SimpleDateFormat("dd MMMM yyyy");
                     Calendar cal = Calendar.getInstance();
                     String todays_date = df.format(cal.getTime());
-                    speak("the today's date is "+todays_date);
+                    speak("the today's date is " + todays_date);
                 }//tells currunt date
             }
-        }
-        if(msgs.indexOf("open")!= -1){
-            if(msgs.indexOf("google")!= -1){
-                Intent intent =new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com"));//to open youtube
-                startActivity(intent);
-            }
+            if (msgs.indexOf("your") != -1) {
+                if (msgs.indexOf("job") != -1) {
+                        String name[] = {"I have the best job for an assistant, helping you. ",
+                                "What can i do for you.",
+                                "My job is to make your life easier,",
+                                        " tell me what can i do for you.",
+                                "My job is to help you. I am your Assistant.",
+                                "I'm here to help you find info, get stuff done, and have fun.",
+                                "I'm professionally useful, whatever you need,",
+                                        " i'm here to here"};
 
-            if(msgs.indexOf("youtube")!= -1){
-                Intent intent =new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com"));//to open youtube
+                        {
+                            Random random = new Random();
+                            int index = random.nextInt(name.length - 0) + 0;
+                            speak("" + name[index]);
+                        }
+
+                    }
+                    if (msgs.indexOf("work") != -1) {
+                        String name[] = {"I have the best job for an assistant, helping you. ",
+                                "What can i do for you.",
+                                "My job is to make your life easier,",
+                                " tell me what can i do for you.",
+                                "My job is to help you. I am your Assistant.",
+                                "I'm here to help you find info, get stuff done, and have fun.",
+                                "I'm professionally useful, whatever you need,",
+                                " i'm here to here"};
+
+                        {
+                            Random random = new Random();
+                            int index = random.nextInt(name.length - 0) + 0;
+                            speak("" + name[index]);
+                        }
+
+                    }
+                }
+            }
+        if (msgs.indexOf("you")!= -1) {
+            if (msgs.indexOf("marry") != -1) {
+
+                String name[] = {"This is one of those things we'd both have to agree on.",
+                        " I'd like to just be frinds. Thank you for the love though",
+                        "This is one of those things we'd both have to agree on. ",
+                                "I'd prefer to keep our relationship friendly."};
+
+                {
+                    Random random = new Random();
+                    int index = random.nextInt(name.length - 0) + 0;
+                    speak("" + name[index]);
+                }
+
+            }
+        }
+
+        if (msgs.indexOf("you")!= -1) {
+            if (msgs.indexOf("married") != -1) {
+                String name[] = {"I'm happy to say I feelwhole all on my own.",
+                        " Plus, I never have to share mithai"};
+                {
+                    Random random = new Random();
+                    int index = random.nextInt(name.length - 0) + 0;
+                    speak("" + name[index]);
+                }
+
+            }
+        }
+        if (msgs.indexOf("you")!= -1) {
+            if (msgs.indexOf("are") != -1) {
+                if (msgs.indexOf("awesome") != -1) {
+
+                    String name[] = {"Thanks!",
+                            "You are!",
+                            "Thanks!, You make everyone around you so happy,",
+                            " they feel like bubbles floating in the air.",
+                            "Thanks, I like to think that beauty comes from within",
+                            "Thats so funny. I was just thinking the same about you"};
+
+                    {
+                        Random random = new Random();
+                        int index = random.nextInt(name.length - 0) + 0;
+                        speak("" + name[index]);
+                    }
+
+                }
+                if (msgs.indexOf("great") != -1) {
+
+                    String name[] = {"Thanks!",
+                            "You are!",
+                            "Thanks!, You make everyone around you so happy, ",
+                                    "they feel like bubbles floating in the air.",
+                            "Thanks, I like to think that beauty comes from within",
+                            "Great? Me? That's so nice",
+                            "Thats so funny. I was just thinking the same about you"};
+
+                    {
+                        Random random = new Random();
+                        int index = random.nextInt(name.length - 0) + 0;
+                        speak("" + name[index]);
+                    }
+
+                }if (msgs.indexOf("amazing") != -1) {
+
+                    String name[] = {"Thanks!",
+                            "You are!",
+                            "Thanks!, You make everyone around you so happy,",
+                                    " they feel like bubbles floating in the air.",
+                            "Thanks, I like to think that beauty comes from within",
+                            "It takes someone amazing to know something's amazing. ",
+                                    "You're amazing, too",
+                            "Thats so funny. I was just thinking the same about you"};
+
+                    {
+                        Random random = new Random();
+                        int index = random.nextInt(name.length - 0) + 0;
+                        speak("" + name[index]);
+                    }
+
+
+                }
+                if (msgs.indexOf("good") != -1) {
+
+                    String name[] = {"Thanks!",
+                            "You are!",
+                            "Thanks!, You make everyone around you so happy, ",
+                            "they feel like bubbles floating in the air.",
+                            "Thanks, I like to think that beauty comes from within"};
+
+                    {
+                        Random random = new Random();
+                        int index = random.nextInt(name.length - 0) + 0;
+                        speak("" + name[index]);
+                    }
+
+                }
+            }
+        }
+        if (msgs.indexOf("who")!= -1) {
+            if (msgs.indexOf("your") != -1) {
+                if (msgs.indexOf("Boss") != -1) {
+
+                    String name[] = {"Guess that would be you.",
+                            "You, most certainly are the boss of me.",
+                            "I look up to humans who are curious about the world",
+                                    "You definately fit the bill",
+                            "Thanks, I like to think that beauty comes from within",
+                            "You!",
+                            "Without doubt, you give me a purpose"};
+
+                    {
+                        Random random = new Random();
+                        int index = random.nextInt(name.length - 0) + 0;
+                        speak("" + name[index]);
+                    }
+
+                }
+            }
+        }
+
+
+        if (msgs.indexOf("open") != -1) {
+            if (msgs.indexOf("google") != -1) {
+                Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com"));//to open youtube
                 startActivity(intent);
             }
-            if(msgs.indexOf("facebook")!= -1){
-                Intent intent =new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.facebook.com"));// To open faceboock webpage
+            if (msgs.indexOf("youtube") != -1) {
+                Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com"));//to open youtube
                 startActivity(intent);
             }
-            if(msgs.indexOf("whatsapp")!= -1){
+            if (msgs.indexOf("facebook") != -1) {
+                Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.facebook.com"));// To open faceboock webpage
+                startActivity(intent);
+            }
+            if (msgs.indexOf("whatsapp") != -1) {
                 Context ctx = this;
                 Intent i = ctx.getPackageManager().getLaunchIntentForPackage("com.whatsapp");//to open whatsapp
                 ctx.startActivity(i);
             }
+            if (msgs.indexOf("instagram") != -1) {
+                Context ctx = this;
+                Intent i = ctx.getPackageManager().getLaunchIntentForPackage("com.instagram.android");//to open instagram
+                ctx.startActivity(i);
+            }
+            if (msgs.indexOf("spotify") != -1) {
+                Context ctx = this;
+                Intent i = ctx.getPackageManager().getLaunchIntentForPackage("com.spotify.music");//to open spotify
+                ctx.startActivity(i);
+            }
+            if (msgs.indexOf("google photos") != -1) {
+                Context ctx = this;
+                Intent i = ctx.getPackageManager().getLaunchIntentForPackage("com.google.android.apps.photos");//to open google maps
+                ctx.startActivity(i);
+            }
+            if (msgs.indexOf("gmail") != -1) {
+                Context ctx = this;
+                Intent i = ctx.getPackageManager().getLaunchIntentForPackage("com.google.android.gm");//to open gmail
+                ctx.startActivity(i);
+            }
+            if (msgs.indexOf("maps") != -1) {
+                Context ctx = this;
+                Intent i = ctx.getPackageManager().getLaunchIntentForPackage("com.google.android.apps.maps");//to open gogle maps
+                ctx.startActivity(i);
+            }
+            if (msgs.indexOf("playstore") != -1) {
+                Context ctx = this;
+                Intent i = ctx.getPackageManager().getLaunchIntentForPackage("com.android.vending");//to open playstore
+                ctx.startActivity(i);
+            }
+            if (msgs.indexOf("calender") != -1) {
+                Context ctx = this;
+                Intent i = ctx.getPackageManager().getLaunchIntentForPackage("com.android.calender");//to open calender
+                ctx.startActivity(i);
+            }
+            if (msgs.indexOf("drive") != -1) {
+                Context ctx = this;
+                Intent i = ctx.getPackageManager().getLaunchIntentForPackage("com.google.android.apps.docs");//to open drive
+                ctx.startActivity(i);
+            }
+            if (msgs.indexOf("twitter") != -1) {
+                Context ctx = this;
+                Intent i = ctx.getPackageManager().getLaunchIntentForPackage("com.twitter.android");//to open twitter
+                ctx.startActivity(i);
+            }
         }
 
-        if(msgs.indexOf("call")!= -1){
-            final String[] listname ={""};
+        if (msgs.indexOf("call") != -1) {
+            final String[] listname = {""};
             final String name = fetchName(msgs);
-            Log.d("Name",name);
-
+            Log.d("Name", name);
             Dexter.withContext(this)
                     .withPermissions(
                             Manifest.permission.READ_CONTACTS,
@@ -243,9 +617,9 @@ public class MainActivity extends AppCompatActivity {
                                 for (String i : list.keySet()) {
                                     listname[0] = listname[0].concat("..........................!" + i);
                                 }
-                                speak("Which one sir ? .. There is " + listname[0]);
+                                speak("Which one ? .. There is " + listname[0]);
                             } else if (list.size() == 1) {
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N){
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                                     makeCall(MainActivity.this, list.values().stream().findFirst().get());
                                     clearContactListSavedData(MainActivity.this);
                                 }
@@ -258,23 +632,74 @@ public class MainActivity extends AppCompatActivity {
                     if (report.isAnyPermissionPermanentlyDenied()) {
                     }
                 }
-                @Override public void onPermissionRationaleShouldBeShown(List<PermissionRequest> permissions, PermissionToken token) {
-                    token.continuePermissionRequest();}
 
+                @Override
+                public void onPermissionRationaleShouldBeShown(List<PermissionRequest> permissions, PermissionToken token) {
+                    token.continuePermissionRequest();
+                }
             }).check();
         }
+        if (msgs.indexOf("search") != -1) {
+            Intent intent = new Intent(Intent.ACTION_WEB_SEARCH);
+            String[] replace = textView.getText().toString().split("search");
+            intent.putExtra(SearchManager.QUERY, String.valueOf(replace[1]));
+            startActivity(intent);
+        }
+        if (msgs.indexOf("play") != -1) {
+            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/results?search_query="));// To open faceboock webpage
+            String[] replace = textView.getText().toString().split("play");
+            intent.putExtra(SearchManager.QUERY, String.valueOf(replace[1]));
+            startActivity(intent);
+        }
+        if (msgs.indexOf("repeate") != -1) {
+            String[] replace = textView.getText().toString().split("repeate");
+            String.valueOf(replace[1]);
+            speak("" + replace);
+        }
+        if (msgs.indexOf("bluetooth") != -1) {
+            if (msgs.indexOf("on") != -1) {
+                Intent intent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+                startActivity(intent);
+            }
+            if (msgs.indexOf("off") != -1) {
+                BluetoothAdapter bAdapter = BluetoothAdapter.getDefaultAdapter();
+                bAdapter.disable();
+            }
+        }
 
+        if (msgs.indexOf("Wi-Fi") != -1) {
+            if (msgs.indexOf("on") != -1) {
+                wifiManager.setWifiEnabled(true);
+            }
+            if (msgs.indexOf("off") != -1) {
+                wifiManager.setWifiEnabled(false);
+            }
 
+        }
+        if (msgs.indexOf("Torch") != -1) {
+            if (msgs.indexOf("on") != -1) {
+                try {
+                    cameraManager.setTorchMode(cameraID, true);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
 
+            }
+            if (msgs.indexOf("off") != -1) {
+                try {
+                    cameraManager.setTorchMode(cameraID, false);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+
+            }
+
+        }
     }
 
-
-    public void Record(View view) {
-        intentRecognizer = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);//The constant ACTION_RECOGNIZE_SPEECH starts an activity that will prompt the user for speech and send it through a speech recognizer.
-        intentRecognizer.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, //Informs the recognizer which speech model to prefer when performing ACTION_RECOGNIZE_SPEECH.
-                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM); //Use a language model based on free-form speech recognition
-        intentRecognizer.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
-        speechRecognizer.startListening(intentRecognizer);
+    public void buttonStart(View view){
+        setContentView(R.layout.surfaceview);
+        textRecognizer();
     }
 
 }
