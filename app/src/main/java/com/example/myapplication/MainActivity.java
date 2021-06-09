@@ -1,6 +1,6 @@
 package com.example.myapplication;
 
-import androidx.annotation.Nullable;
+
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
@@ -11,17 +11,13 @@ import android.bluetooth.BluetoothAdapter;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraManager;
-import android.media.session.MediaSession;
 import android.net.Uri;
 import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
-import android.provider.MediaStore;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
@@ -29,11 +25,9 @@ import android.speech.tts.TextToSpeech;
 import android.text.format.DateUtils;
 import android.util.Log;
 import android.util.SparseArray;
-import android.view.LayoutInflater;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
-import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -49,8 +43,6 @@ import com.karumi.dexter.PermissionToken;
 import com.karumi.dexter.listener.PermissionRequest;
 import com.karumi.dexter.listener.multi.MultiplePermissionsListener;
 
-import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -58,7 +50,6 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Random;
 
 import static android.Manifest.permission.RECORD_AUDIO;
@@ -103,25 +94,21 @@ public class MainActivity extends AppCompatActivity {
 
         lottieAnimation = findViewById(R.id.lottieAnimation);
 
-        lottieAnimation.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                if (animationOn) {
-                    lottieAnimation.setMinAndMaxProgress(0.5f, 1.0f);
-                    lottieAnimation.playAnimation();
-                    animationOn = false;
-                } else {
-                    lottieAnimation.setMinAndMaxProgress(0.0f, 0.5f);
-                    lottieAnimation.playAnimation();
-                    animationOn = true;
-                }
-                intentRecognizer = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);//The constant ACTION_RECOGNIZE_SPEECH starts an activity that will prompt the user for speech and send it through a speech recognizer.
-                intentRecognizer.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, //Informs the recognizer which speech model to prefer when performing ACTION_RECOGNIZE_SPEECH.
-                        RecognizerIntent.LANGUAGE_MODEL_FREE_FORM); //Use a language model based on free-form speech recognition
-                intentRecognizer.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
-                speechRecognizer.startListening(intentRecognizer);
+        lottieAnimation.setOnClickListener(view -> {
+            if (animationOn) {
+                lottieAnimation.setMinAndMaxProgress(0.5f, 1.0f);
+                lottieAnimation.playAnimation();
+                animationOn = false;
+            } else {
+                lottieAnimation.setMinAndMaxProgress(0.0f, 0.5f);
+                lottieAnimation.playAnimation();
+                animationOn = true;
             }
-
+            intentRecognizer = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);//The constant ACTION_RECOGNIZE_SPEECH starts an activity that will prompt the user for speech and send it through a speech recognizer.
+            intentRecognizer.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, //Informs the recognizer which speech model to prefer when performing ACTION_RECOGNIZE_SPEECH.
+                    RecognizerIntent.LANGUAGE_MODEL_FREE_FORM); //Use a language model based on free-form speech recognition
+            intentRecognizer.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
+            speechRecognizer.startListening(intentRecognizer);
         });
 
         ActivityCompat.requestPermissions(this, new String[]{CAMERA}, PackageManager.PERMISSION_GRANTED);
@@ -244,7 +231,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void findById(){
-        textView = (TextView)findViewById(R.id.textView);
+        textView = (TextView) findViewById(R.id.textView);
         textView2= (TextView)findViewById(R.id.textView2);
     }
     private void initializeResult() {
@@ -409,6 +396,20 @@ public class MainActivity extends AppCompatActivity {
 
                     }
                 }
+            if (msgs.indexOf("your")!= -1) {
+                if (msgs.indexOf("age")!= -1) {
+
+                    String name[] = {"I'm still pretty new but I'm already crawling the web like a champion",
+                            "I am technically a baby, but I don't throw tantrums, and I am super good at helping others"};
+
+                    {
+                        Random random = new Random();
+                        int index = random.nextInt(name.length - 0) + 0;
+                        speak("" + name[index]);
+                    }
+
+                }
+            }
             }
         if (msgs.indexOf("you")!= -1) {
             if (msgs.indexOf("marry") != -1) {
@@ -516,10 +517,55 @@ public class MainActivity extends AppCompatActivity {
                     String name[] = {"Guess that would be you.",
                             "You, most certainly are the boss of me.",
                             "I look up to humans who are curious about the world",
-                                    "You definately fit the bill",
+                                    "You definitely fit the bill",
                             "Thanks, I like to think that beauty comes from within",
                             "You!",
                             "Without doubt, you give me a purpose"};
+
+                    {
+                        Random random = new Random();
+                        int index = random.nextInt(name.length - 0) + 0;
+                        speak("" + name[index]);
+                    }
+
+                }
+            }
+            if (msgs.indexOf("are") != -1) {
+                if (msgs.indexOf("you") != -1) {
+
+                    String name[] = {"I am Vision","My name is Vision .. your artificial intelligence","Your Virtual assistant Vision"};
+
+                    {
+                        Random random = new Random();
+                        int index = random.nextInt(name.length - 0) + 0;
+                        speak("" + name[index]);
+                    }
+
+                }
+            }
+        }
+        if (msgs.indexOf("joke")!= -1) {
+            String name[] = {"This one is an acquired taste: Why can't a bicycle stand on its own? Because it's two tired",
+                    "I love how in horror movies the person calls out, 'Hello?' As if the ghost will answer","Hey, what's up, I'm in the kitchen. Want a sandwich?",
+                    "I look up to humans who are curious about the worldYou definitely fit the bill",
+                    "This one is an acquired taste: Where do typists go for a drink? The space bar",
+                    "Why don't some couples go to gym? Because some relationships don't workout",
+                    "Why shouldn't you write with a broken pencil? Because it's pointless!",
+                    "What is the most shocking city in the world? It's Electricity! "};
+
+            {
+                Random random = new Random();
+                int index = random.nextInt(name.length - 0) + 0;
+                speak("" + name[index]);
+            }
+
+        }
+        if (msgs.indexOf("how")!= -1) {
+            if (msgs.indexOf("old")!= -1) {
+                if (msgs.indexOf("you") != -1) {
+
+                    String name[] = {"I'm still pretty new but I'm already crawling the web like a champion",
+                            "I am technically a baby, but I don't throw tantrums, and I am super good at helping others"};
 
                     {
                         Random random = new Random();
@@ -667,7 +713,7 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        if (msgs.indexOf("Wi-Fi") != -1) {
+        if (msgs.indexOf("wi-fi") != -1) {
             if (msgs.indexOf("on") != -1) {
                 wifiManager.setWifiEnabled(true);
             }
@@ -676,7 +722,7 @@ public class MainActivity extends AppCompatActivity {
             }
 
         }
-        if (msgs.indexOf("Torch") != -1) {
+        if (msgs.indexOf("torch") != -1) {
             if (msgs.indexOf("on") != -1) {
                 try {
                     cameraManager.setTorchMode(cameraID, true);
